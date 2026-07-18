@@ -37,6 +37,10 @@
     border-radius:8px; padding:0.6em 0.8em; min-height:44px; width:100%;
   }
   label { display:block; font-weight:500; margin-bottom:0.3em; color:var(--text-secondary); }
+  select {
+    background:var(--bg-secondary); color:var(--text-primary); border:1px solid var(--border);
+    border-radius:8px; padding:0.6em 0.8em; min-height:44px; width:100%;
+  }
   .field { margin-bottom:1em; }
   header {
     display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5em;
@@ -208,6 +212,40 @@
       <section class="card" aria-labelledby="history-heading">
         <h2 id="history-heading">Past plans</h2>
         <div id="plan-history-list" class="muted">No completed plans yet.</div>
+      </section>
+
+      <!-- FAMOUS PLAYER COMPARISON -->
+      <section class="card" aria-labelledby="compare-heading">
+        <h2 id="compare-heading">Famous player comparison</h2>
+        <div class="field">
+          <label for="compare-game">Your game</label>
+          <select id="compare-game"></select>
+        </div>
+        <div class="field">
+          <label for="compare-player">Famous player</label>
+          <select id="compare-player">
+            <option value="Garry Kasparov">Garry Kasparov</option>
+            <option value="Magnus Carlsen">Magnus Carlsen</option>
+            <option value="Bobby Fischer">Bobby Fischer</option>
+            <option value="Mikhail Tal">Mikhail Tal</option>
+            <option value="José Raúl Capablanca">José Raúl Capablanca</option>
+            <option value="Anatoly Karpov">Anatoly Karpov</option>
+            <option value="custom">Other (type below)</option>
+          </select>
+        </div>
+        <div class="field" id="compare-player-custom-field" hidden>
+          <label for="compare-player-custom">Custom player name</label>
+          <input type="text" id="compare-player-custom" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="anthropic-key">Anthropic API key</label>
+          <input type="password" id="anthropic-key" autocomplete="off">
+          <p class="muted">Stored only in this browser (localStorage). Never synced to the cloud. Get a key at console.anthropic.com.</p>
+        </div>
+        <button id="btn-compare">Compare game</button>
+        <div id="compare-status" aria-live="polite" class="muted" style="margin-top:0.6em;"></div>
+        <div id="compare-error" class="error-box" role="alert" hidden></div>
+        <div id="compare-results"></div>
       </section>
 
     </div>
@@ -533,7 +571,8 @@ function deriveGame(raw, username) {
   return {
     myColor, myRating, oppRating: oppSide.rating, resultBucket, lossType,
     plyCount, opening, myAccuracy, end_time: raw.end_time || 0,
-    time_class: raw.time_class, rules: raw.rules, rated: raw.rated
+    time_class: raw.time_class, rules: raw.rules, rated: raw.rated,
+    pgn: raw.pgn || '', url: raw.url || ''
   };
 }
 
@@ -828,6 +867,7 @@ async function runAnalysis(username, triggeredByUser) {
 
     const pool = buildGamePool(rawGames, username);
     liveGames = pool;
+    populateCompareGames();
 
     if (pool.length < 20) {
       document.getElementById('insufficient-data').hidden = false;
@@ -1188,6 +1228,201 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
   if (!username) return;
   runAnalysis(username, true);
 });
+
+/* =========================================================
+   FAMOUS PLAYER COMPARISON
+   ========================================================= */
+const ANTHROPIC_KEY_STORAGE = 'chessprogress_anthropic_key';
+
+(function initCompareKey() {
+  const keyInput = document.getElementById('anthropic-key');
+  const savedKey = localStorage.getItem(ANTHROPIC_KEY_STORAGE);
+  if (savedKey) keyInput.value = savedKey;
+  keyInput.addEventListener('change', () => {
+    localStorage.setItem(ANTHROPIC_KEY_STORAGE, keyInput.value);
+  });
+})();
+
+document.getElementById('compare-player').addEventListener('change', e => {
+  document.getElementById('compare-player-custom-field').hidden = e.target.value !== 'custom';
+});
+
+function populateCompareGames() {
+  const sel = document.getElementById('compare-game');
+  const withPgn = [];
+  for (let i = 0; i < liveGames.length; i++) {
+    if (liveGames[i].pgn) withPgn.push(i);
+  }
+  withPgn.sort((a, b) => liveGames[b].end_time - liveGames[a].end_time);
+  const top20 = withPgn.slice(0, 20);
+  let html = '';
+  for (const idx of top20) {
+    const g = liveGames[idx];
+    const dateStr = g.end_time ? new Date(g.end_time * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '?';
+    const label = `${dateStr} · ${g.myColor} vs ${g.oppRating} · ${g.resultBucket} · ${g.opening}`;
+    html += `<option value="${idx}">${escapeHTML(label)}</option>`;
+  }
+  sel.innerHTML = html || '<option value="">No games with PGN available</option>';
+}
+
+function showCompareError(msg) {
+  const el = document.getElementById('compare-error');
+  el.textContent = msg;
+  el.hidden = false;
+}
+
+async function runComparison() {
+  const errEl = document.getElementById('compare-error');
+  const statusEl = document.getElementById('compare-status');
+  const resultsEl = document.getElementById('compare-results');
+  const btn = document.getElementById('btn-compare');
+  errEl.hidden = true;
+  errEl.textContent = '';
+  resultsEl.innerHTML = '';
+
+  const gameSel = document.getElementById('compare-game');
+  const gameIdx = gameSel.value;
+  const game = gameIdx !== '' ? liveGames[Number(gameIdx)] : null;
+
+  const playerSel = document.getElementById('compare-player');
+  let playerName = playerSel.value;
+  if (playerName === 'custom') {
+    playerName = document.getElementById('compare-player-custom').value.trim();
+  }
+
+  const apiKey = document.getElementById('anthropic-key').value.trim();
+
+  if (!game || !game.pgn) { showCompareError('Choose a game first.'); return; }
+  if (!playerName) { showCompareError('Enter or choose a famous player.'); return; }
+  if (!apiKey) { showCompareError('Enter your Anthropic API key.'); return; }
+
+  let pgnText = game.pgn;
+  if (pgnText.length > 8000) pgnText = pgnText.slice(0, 8000);
+  const myColor = game.myColor;
+
+  statusEl.textContent = 'Analyzing with Claude — this can take a minute…';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-8',
+        max_tokens: 16000,
+        system: 'You are a chess grandmaster and historian with deep knowledge of famous players\' styles. Be concise: every "why" must be at most 2 short sentences.',
+        output_config: {
+          format: {
+            type: 'json_schema',
+            schema: {
+              type: 'object',
+              properties: {
+                summary: { type: 'string', description: '3-4 sentence overall comparison of how the famous player would have approached this game differently' },
+                moves: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      moveNumber: { type: 'integer' },
+                      yourMove: { type: 'string' },
+                      famousMove: { type: 'string', description: 'the move the famous player would most likely have played here, in SAN' },
+                      agrees: { type: 'boolean', description: 'true if famousMove is the same as yourMove' },
+                      why: { type: 'string' }
+                    },
+                    required: ['moveNumber', 'yourMove', 'famousMove', 'agrees', 'why'],
+                    additionalProperties: false
+                  }
+                }
+              },
+              required: ['summary', 'moves'],
+              additionalProperties: false
+            }
+          }
+        },
+        messages: [{
+          role: 'user',
+          content: `I played ${myColor} in this game. For each of MY moves (only ${myColor}'s moves), tell me what ${playerName} would most likely have played in that position and briefly why, reflecting ${playerName}'s real style. Mark agrees=true when the move matches mine.\n\nPGN:\n${pgnText}`
+        }]
+      })
+    });
+
+    if (!res.ok) {
+      let msg = 'API error ' + res.status;
+      try {
+        const errBody = await res.json();
+        msg = (errBody.error && errBody.error.message) || msg;
+      } catch (e) { /* ignore parse failure */ }
+      if (res.status === 401) msg += ' Check your API key.';
+      showCompareError(msg);
+      statusEl.textContent = '';
+      return;
+    }
+
+    const data = await res.json();
+
+    if (data.stop_reason === 'refusal') {
+      showCompareError('Claude declined to answer this request. Try a different game or player.');
+      statusEl.textContent = '';
+      return;
+    }
+
+    const textBlock = data.content && data.content.find(b => b.type === 'text');
+    if (!textBlock) {
+      showCompareError('No text response received from Claude.');
+      statusEl.textContent = '';
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(textBlock.text);
+    } catch (e) {
+      showCompareError('Could not parse Claude\'s response as JSON.');
+      statusEl.textContent = '';
+      return;
+    }
+
+    statusEl.textContent = '';
+    renderCompareResults(parsed, playerName);
+  } catch (err) {
+    showCompareError(err.message || 'Network error while contacting the Anthropic API.');
+    statusEl.textContent = '';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderCompareResults(result, playerName) {
+  const el = document.getElementById('compare-results');
+  const moves = result.moves || [];
+  const agreedCount = moves.filter(m => m.agrees).length;
+  const pct = moves.length ? Math.round((agreedCount / moves.length) * 100) : 0;
+
+  let html = `<p>${escapeHTML(result.summary || '')}</p>`;
+  html += `<p class="muted">Agreed on ${agreedCount} of ${moves.length} moves (${pct}%)</p>`;
+  html += '<div style="overflow-x:auto;"><table>';
+  html += `<caption class="visually-hidden">Move by move comparison with ${escapeHTML(playerName)}</caption>`;
+  html += `<thead><tr><th>#</th><th>Your move</th><th>${escapeHTML(playerName)}'s move</th><th>Why</th></tr></thead><tbody>`;
+  for (const m of moves) {
+    const icon = m.agrees ? '✅' : '✦';
+    const color = m.agrees ? 'var(--success)' : 'var(--accent-cyan)';
+    html += `<tr>
+      <td>${escapeHTML(m.moveNumber)}</td>
+      <td>${escapeHTML(m.yourMove)}</td>
+      <td>${icon} <span style="color:${color};">${escapeHTML(m.famousMove)}</span></td>
+      <td>${escapeHTML(m.why)}</td>
+    </tr>`;
+  }
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+document.getElementById('btn-compare').addEventListener('click', runComparison);
 </script>
 </body>
 </html>
