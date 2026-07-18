@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chess Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary:#0d1b2a; --bg-secondary:#1a2a3a; --bg-card:#1e3044;
+    --accent-cyan:#00d9ff; --accent-purple:#7c3aed;
+    --text-primary:#f0f4f8; --text-secondary:#8ba3be; --text-muted:#5a7a9a;
+    --border:#2a3f55; --error:#ef4444; --success:#22c55e; --warning:#f59e0b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body {
+    font-family:'IBM Plex Sans', system-ui, sans-serif;
+    background:var(--bg-primary); color:var(--text-primary);
+    line-height:1.5; min-height:100vh;
+  }
+  a { color: var(--accent-cyan); }
+  :focus-visible { outline:3px solid var(--accent-cyan); outline-offset:2px; }
+  button, input, select { font-family:inherit; font-size:1rem; }
+  button {
+    cursor:pointer; background:var(--accent-cyan); color:#04121c; border:none;
+    border-radius:8px; padding:0.7em 1.2em; font-weight:600; min-height:44px;
+  }
+  button.secondary { background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); }
+  button.danger { background:var(--error); color:#fff; }
+  button:disabled { opacity:0.55; cursor:not-allowed; }
+  button:hover:not(:disabled) { filter:brightness(1.1); }
+  input[type="text"], input[type="email"], input[type="password"] {
+    background:var(--bg-secondary); color:var(--text-primary); border:1px solid var(--border);
+    border-radius:8px; padding:0.6em 0.8em; min-height:44px; width:100%;
+  }
+  label { display:block; font-weight:500; margin-bottom:0.3em; color:var(--text-secondary); }
+  .field { margin-bottom:1em; }
+  header {
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5em;
+    padding:1em 1.5em; background:var(--bg-secondary); border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:10;
+  }
+  header h1 { font-size:1.25rem; margin:0; display:flex; align-items:center; gap:0.5em; }
+  header .header-right { display:flex; align-items:center; gap:1em; flex-wrap:wrap; }
+  #sync-status { font-size:0.9rem; color:var(--text-secondary); white-space:nowrap; }
+  main { max-width:1100px; margin:0 auto; padding:1.5em; }
+  .card {
+    background:var(--bg-card); border:1px solid var(--border); border-radius:12px;
+    padding:1.25em; margin-bottom:1.25em;
+  }
+  .card h2 { margin-top:0; font-size:1.1rem; }
+  .card h3 { font-size:1rem; color:var(--text-secondary); }
+  .grid { display:grid; gap:1em; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); }
+  .muted { color:var(--text-secondary); }
+  .error-box {
+    background:rgba(239,68,68,0.12); border:1px solid var(--error); color:var(--text-primary);
+    border-radius:8px; padding:1em; margin:1em 0; display:flex; flex-direction:column; gap:0.6em;
+  }
+  .error-box strong { color:var(--error); }
+  .badge {
+    display:inline-flex; align-items:center; gap:0.4em; padding:0.25em 0.6em; border-radius:999px;
+    font-size:0.85rem; font-weight:600; border:1px solid var(--border); background:var(--bg-secondary);
+  }
+  .badge.achieved { color:var(--success); border-color:var(--success); }
+  .badge.on-track { color:var(--accent-cyan); border-color:var(--accent-cyan); }
+  .badge.flat { color:var(--text-secondary); }
+  .badge.regressing { color:var(--warning); border-color:var(--warning); }
+  .badge.pending { color:var(--text-secondary); }
+  .severity-bar-track { background:var(--bg-secondary); border-radius:999px; height:10px; overflow:hidden; }
+  .severity-bar-fill { background:linear-gradient(90deg, var(--accent-cyan), var(--accent-purple)); height:100%; }
+  .weakness-item { margin-bottom:1.1em; }
+  .weakness-item .evidence { color:var(--text-secondary); font-size:0.9rem; margin-top:0.3em; }
+  .goal { border:1px solid var(--border); border-radius:10px; padding:1em; margin-bottom:1em; }
+  .goal-head { display:flex; justify-content:space-between; align-items:center; gap:0.5em; flex-wrap:wrap; }
+  .drills { margin:0.6em 0 0; padding-left:1.2em; }
+  .drills li { margin-bottom:0.3em; }
+  .rating-card { text-align:left; }
+  .rating-card .value { font-size:1.6rem; font-weight:700; }
+  .trend { font-size:0.9rem; display:flex; align-items:center; gap:0.3em; }
+  .trend.up { color:var(--success); }
+  .trend.down { color:var(--error); }
+  .trend.flat { color:var(--text-secondary); }
+  .visually-hidden {
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+  .login-wrap { max-width:420px; margin:3em auto; }
+  .divider { display:flex; align-items:center; gap:0.8em; color:var(--text-muted); margin:1em 0; }
+  .divider::before, .divider::after { content:""; flex:1; height:1px; background:var(--border); }
+  .banner-success {
+    background:rgba(34,197,94,0.12); border:1px solid var(--success); border-radius:10px;
+    padding:1em; margin-bottom:1.25em; color:var(--text-primary);
+  }
+  .banner-success strong { color:var(--success); }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:0.5em; border-bottom:1px solid var(--border); }
+  th { color:var(--text-secondary); font-weight:600; }
+  .sparkline-wrap { overflow-x:auto; }
+  .plan-history-item { border-bottom:1px solid var(--border); padding:0.7em 0; }
+  .plan-history-item:last-child { border-bottom:none; }
+  footer { text-align:center; color:var(--text-muted); padding:2em 1em; font-size:0.85rem; }
+  @media (max-width:700px) {
+    main { padding:1em; }
+    header { padding:0.8em 1em; }
+    .grid { grid-template-columns:1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration:0.01ms !important; transition-duration:0.01ms !important; }
+  }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>♟️ Chess Progress</h1>
+  <div class="header-right">
+    <span id="sync-status" aria-live="polite">🔄 Loading…</span>
+    <button id="btn-signout" class="secondary" hidden>Sign out</button>
+  </div>
+</header>
+
+<main id="app-root">
+
+  <!-- LOGIN SCREEN -->
+  <section id="login-screen" class="login-wrap" aria-labelledby="login-heading">
+    <div class="card">
+      <h2 id="login-heading">Sign in</h2>
+      <div id="auth-error" class="error-box" role="alert" hidden></div>
+      <form id="email-form">
+        <div class="field">
+          <label for="email-input">Email</label>
+          <input type="email" id="email-input" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="password-input">Password</label>
+          <input type="password" id="password-input" autocomplete="current-password" required>
+        </div>
+        <div style="display:flex; gap:0.6em; flex-wrap:wrap;">
+          <button type="submit" id="btn-signin">Sign in</button>
+          <button type="button" id="btn-signup" class="secondary">Create account</button>
+        </div>
+      </form>
+      <div class="divider">or</div>
+      <button type="button" id="btn-google" class="secondary" style="width:100%;">Sign in with Google</button>
+    </div>
+  </section>
+
+  <!-- APP (visible once authed) -->
+  <div id="app-screen" hidden>
+
+    <!-- SETUP CARD -->
+    <section class="card" aria-labelledby="setup-heading">
+      <h2 id="setup-heading">Chess.com account</h2>
+      <form id="setup-form">
+        <div class="field">
+          <label for="username-input">Chess.com username</label>
+          <input type="text" id="username-input" autocomplete="off" placeholder="e.g. hikaru">
+        </div>
+        <button type="submit" id="btn-analyze">Analyze</button>
+      </form>
+      <div id="fetch-status" aria-live="polite" class="muted" style="margin-top:0.6em;"></div>
+      <div id="fetch-error" class="error-box" role="alert" hidden></div>
+    </section>
+
+    <div id="insufficient-data" class="card" hidden>
+      <h2>Not enough data yet</h2>
+      <p class="muted">We need at least 20 rated chess games (in one time class) to build an analysis. Play more rated games on chess.com and click "Refresh analysis".</p>
+    </div>
+
+    <div id="dashboard" hidden>
+
+      <div id="achieved-banner" class="banner-success" hidden role="status"></div>
+
+      <div style="display:flex; justify-content:flex-end; margin-bottom:1em;">
+        <button id="btn-refresh" class="secondary">🔄 Refresh analysis</button>
+      </div>
+
+      <!-- RATING OVERVIEW -->
+      <section class="card" aria-labelledby="rating-heading">
+        <h2 id="rating-heading">Rating overview</h2>
+        <div id="rating-cards" class="grid"></div>
+      </section>
+
+      <!-- WEAKNESSES -->
+      <section class="card" aria-labelledby="weakness-heading">
+        <h2 id="weakness-heading">Top weaknesses</h2>
+        <div id="weakness-panel"></div>
+      </section>
+
+      <!-- ACTIVE PLAN -->
+      <section class="card" aria-labelledby="plan-heading">
+        <h2 id="plan-heading">Active development plan</h2>
+        <div id="plan-panel"></div>
+      </section>
+
+      <!-- PROGRESS HISTORY -->
+      <section class="card" aria-labelledby="progress-heading">
+        <h2 id="progress-heading">Progress history</h2>
+        <div id="sparkline-wrap" class="sparkline-wrap"></div>
+        <div id="checkpoint-list"></div>
+      </section>
+
+      <!-- PAST PLANS -->
+      <section class="card" aria-labelledby="history-heading">
+        <h2 id="history-heading">Past plans</h2>
+        <div id="plan-history-list" class="muted">No completed plans yet.</div>
+      </section>
+
+    </div>
+  </div>
+
+</main>
+
+<footer>Chess Progress · data from the public chess.com API</footer>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<script>
+'use strict';
+
+/* =========================================================
+   FIREBASE CONFIG — PLACEHOLDER: fill in from Firebase Console
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyAlAMx3-XMV9cxjDN2KDGhyIC-vzS7BTWs",
+  authDomain: "chessprogress-bakr.firebaseapp.com",
+  databaseURL: "https://chessprogress-bakr-default-rtdb.firebaseio.com",
+  projectId: "chessprogress-bakr",
+  storageBucket: "chessprogress-bakr.firebasestorage.app",
+  messagingSenderId: "1067819963124",
+  appId: "1:1067819963124:web:05d6f7ee40189eaefd04a1"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+
+const APP_KEY = 'chessprogress';
+
+/* =========================================================
+   STATE
+   ========================================================= */
+let currentUid = null;
+let saveTimer = null;
+let appData = null;      // persisted structure
+let liveGames = [];      // fetched games (not persisted)
+let liveMetrics = null;  // computed each analysis run
+
+function getDefaultData() {
+  return {
+    profile: { chessUser: '', mainTimeClass: '', updatedAt: null },
+    activePlanId: null,
+    baselines: {},
+    plans: {},
+    checkpoints: {},
+    history: {}
+  };
+}
+
+/* =========================================================
+   UTIL
+   ========================================================= */
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+function clamp(lo, hi, v) { return Math.max(lo, Math.min(hi, v)); }
+function uid() { return 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8); }
+function todayKey() {
+  const d = new Date();
+  return d.toISOString().slice(0, 10);
+}
+
+function showSyncStatus(state, msg) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const states = {
+    loading: '🔄 Loading…',
+    synced: '✅ Synced',
+    error: `⚠️ ${escapeHTML(msg || 'Error')}`,
+    offline: '📵 Offline'
+  };
+  el.textContent = states[state] || state;
+}
+
+/* =========================================================
+   AUTH
+   ========================================================= */
+auth.getRedirectResult().catch(err => {
+  showAuthError(err.message);
+});
+
+async function signInWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try {
+    await auth.signInWithPopup(provider);
+  } catch (err) {
+    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+      try {
+        await auth.signInWithRedirect(provider);
+      } catch (err2) {
+        showAuthError(err2.message);
+      }
+    } else {
+      showAuthError(err.message);
+    }
+  }
+}
+
+async function signInWithEmail(email, password) {
+  try {
+    await auth.signInWithEmailAndPassword(email, password);
+  } catch (err) {
+    showAuthError(err.message);
+  }
+}
+
+async function signUpWithEmail(email, password) {
+  try {
+    await auth.createUserWithEmailAndPassword(email, password);
+  } catch (err) {
+    showAuthError(err.message);
+  }
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg;
+  el.hidden = false;
+}
+
+document.getElementById('email-form').addEventListener('submit', e => {
+  e.preventDefault();
+  document.getElementById('auth-error').hidden = true;
+  const email = document.getElementById('email-input').value.trim();
+  const password = document.getElementById('password-input').value;
+  signInWithEmail(email, password);
+});
+document.getElementById('btn-signup').addEventListener('click', () => {
+  document.getElementById('auth-error').hidden = true;
+  const email = document.getElementById('email-input').value.trim();
+  const password = document.getElementById('password-input').value;
+  if (!email || !password) { showAuthError('Enter an email and password first.'); return; }
+  signUpWithEmail(email, password);
+});
+document.getElementById('btn-google').addEventListener('click', () => {
+  document.getElementById('auth-error').hidden = true;
+  signInWithGoogle();
+});
+document.getElementById('btn-signout').addEventListener('click', () => auth.signOut());
+
+auth.onAuthStateChanged(user => {
+  if (user) {
+    currentUid = user.uid;
+    document.getElementById('login-screen').hidden = true;
+    document.getElementById('app-screen').hidden = false;
+    document.getElementById('btn-signout').hidden = false;
+    loadFromCloud(user.uid); // ONLY call site
+  } else {
+    currentUid = null;
+    document.getElementById('login-screen').hidden = false;
+    document.getElementById('app-screen').hidden = true;
+    document.getElementById('btn-signout').hidden = true;
+    showSyncStatus('offline');
+  }
+});
+
+/* =========================================================
+   CLOUD LOAD / SAVE
+   ========================================================= */
+async function loadFromCloud(uidVal) {
+  showSyncStatus('loading');
+  const timeoutId = setTimeout(() => {
+    showSyncStatus('offline');
+  }, 8000);
+
+  try {
+    const snapshot = await db.ref(`${APP_KEY}/users/${uidVal}/data`).get();
+    clearTimeout(timeoutId);
+
+    if (snapshot.exists()) {
+      appData = Object.assign(getDefaultData(), snapshot.val());
+      appData.baselines = appData.baselines || {};
+      appData.plans = appData.plans || {};
+      appData.checkpoints = appData.checkpoints || {};
+      appData.history = appData.history || {};
+      appData.profile = appData.profile || getDefaultData().profile;
+    } else {
+      appData = getDefaultData();
+    }
+
+    showSyncStatus('synced');
+    renderAfterLoad();
+  } catch (err) {
+    clearTimeout(timeoutId);
+    showSyncStatus('error', err.message);
+  }
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveToCloud(currentUid), 800);
+}
+
+async function saveToCloud(uidVal) {
+  if (!uidVal || !appData) return;
+  try {
+    await db.ref(`${APP_KEY}/users/${uidVal}/data`).set(appData);
+    showSyncStatus('synced');
+  } catch (err) {
+    showSyncStatus('error', err.message);
+  }
+}
+
+function renderAfterLoad() {
+  document.getElementById('username-input').value = appData.profile.chessUser || '';
+  if (appData.profile.chessUser) {
+    runAnalysis(appData.profile.chessUser, false);
+  }
+}
+
+/* =========================================================
+   FETCHERS (chess.com public API)
+   ========================================================= */
+async function fetchPlayerProfile(username) {
+  const res = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(username)}`);
+  if (res.status === 404) throw new Error(`No chess.com account found for "${username}".`);
+  if (!res.ok) throw new Error(`chess.com API error (${res.status}) while loading profile.`);
+  return res.json();
+}
+
+async function fetchArchivesList(username) {
+  const res = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(username)}/games/archives`);
+  if (!res.ok) throw new Error(`chess.com API error (${res.status}) while loading archive list.`);
+  const data = await res.json();
+  return data.archives || [];
+}
+
+async function fetchArchiveGames(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`chess.com API error (${res.status}) while loading games archive.`);
+  const data = await res.json();
+  return data.games || [];
+}
+
+async function fetchAllGames(username) {
+  const archives = await fetchArchivesList(username);
+  const lastThree = archives.slice(-3);
+  const chunks = await Promise.all(lastThree.map(fetchArchiveGames));
+  let games = chunks.flat();
+  games.sort((a, b) => (b.end_time || 0) - (a.end_time || 0));
+  return games.slice(0, 300);
+}
+
+/* =========================================================
+   GAME PARSING
+   ========================================================= */
+function countPly(pgn) {
+  if (!pgn) return 0;
+  let text = pgn;
+  // strip comments {...}
+  text = text.replace(/\{[^}]*\}/g, ' ');
+  // strip NAGs
+  text = text.replace(/\$\d+/g, ' ');
+  // strip move numbers like "12." or "12..."
+  text = text.replace(/\d+\.(\.\.)?/g, ' ');
+  // strip result token
+  text = text.replace(/\b(1-0|0-1|1\/2-1\/2|\*)\b/g, ' ');
+  const tokens = text.split(/\s+/).map(t => t.trim()).filter(Boolean);
+  // filter out anything that isn't a plausible SAN token
+  return tokens.filter(t => /^[a-hKQRBNO][a-hKQRBNOx0-9=+#\-]*$/.test(t)).length;
+}
+
+function openingFromEco(ecoUrl) {
+  if (!ecoUrl) return 'Unknown opening';
+  try {
+    const parts = ecoUrl.split('/').filter(Boolean);
+    const slug = parts[parts.length - 1] || '';
+    // Strip the appended move sequence (e.g. "...2.g3-g6-3.Bg2") so games
+    // group by opening family rather than exact move order.
+    const name = slug.replace(/(\.\.\.|-\d+\.).*$/, '').replace(/-+$/, '').replace(/-/g, ' ');
+    return name || 'Unknown opening';
+  } catch (e) {
+    return 'Unknown opening';
+  }
+}
+
+function deriveGame(raw, username) {
+  const unameLower = username.toLowerCase();
+  const whiteUser = (raw.white && raw.white.username || '').toLowerCase();
+  const blackUser = (raw.black && raw.black.username || '').toLowerCase();
+  let myColor = null;
+  if (whiteUser === unameLower) myColor = 'white';
+  else if (blackUser === unameLower) myColor = 'black';
+  if (!myColor) return null;
+
+  const mySide = raw[myColor];
+  const oppSide = raw[myColor === 'white' ? 'black' : 'white'];
+  const myRating = mySide.rating;
+  const myResult = mySide.result;
+
+  const drawResults = ['agreed', 'repetition', 'stalemate', 'insufficient', '50move', 'timevsinsufficient'];
+  let resultBucket, lossType = null;
+  if (myResult === 'win') {
+    resultBucket = 'win';
+  } else if (drawResults.includes(myResult)) {
+    resultBucket = 'draw';
+  } else {
+    resultBucket = 'loss';
+    if (myResult === 'checkmated') lossType = 'checkmated';
+    else if (myResult === 'timeout') lossType = 'timeout';
+    else if (myResult === 'resigned') lossType = 'resigned';
+    else if (myResult === 'abandoned') lossType = 'abandoned';
+    else lossType = myResult;
+  }
+
+  const plyCount = countPly(raw.pgn);
+  const opening = openingFromEco(raw.eco);
+  const myAccuracy = raw.accuracies && typeof raw.accuracies[myColor] === 'number' ? raw.accuracies[myColor] : null;
+
+  return {
+    myColor, myRating, oppRating: oppSide.rating, resultBucket, lossType,
+    plyCount, opening, myAccuracy, end_time: raw.end_time || 0,
+    time_class: raw.time_class, rules: raw.rules, rated: raw.rated
+  };
+}
+
+function buildGamePool(rawGames, username) {
+  const parsed = [];
+  for (const g of rawGames) {
+    if (g.rules !== 'chess' || g.rated !== true) continue;
+    const d = deriveGame(g, username);
+    if (d) parsed.push(d);
+  }
+  parsed.sort((a, b) => b.end_time - a.end_time);
+  return parsed;
+}
+
+function pickMainTimeClass(games) {
+  const counts = {};
+  for (const g of games) counts[g.time_class] = (counts[g.time_class] || 0) + 1;
+  let best = null, bestCount = -1;
+  for (const tc in counts) {
+    if (counts[tc] > bestCount) { best = tc; bestCount = counts[tc]; }
+  }
+  return best;
+}
+
+function ratingByTimeClass(games) {
+  const byTc = {};
+  const chrono = [...games].sort((a, b) => a.end_time - b.end_time);
+  for (const g of chrono) {
+    if (!byTc[g.time_class]) byTc[g.time_class] = { first: g.myRating, last: g.myRating };
+    byTc[g.time_class].last = g.myRating;
+  }
+  const result = {};
+  for (const tc in byTc) result[tc] = byTc[tc].last;
+  return result;
+}
+
+/* =========================================================
+   METRICS M1–M9
+   ========================================================= */
+function computeMetrics(mainPool) {
+  const metrics = {};
+  const n = mainPool.length;
+  const chrono = [...mainPool].sort((a, b) => a.end_time - b.end_time);
+
+  // overall
+  const wins = mainPool.filter(g => g.resultBucket === 'win').length;
+  const losses = mainPool.filter(g => g.resultBucket === 'loss');
+  const overallWinRate = n > 0 ? wins / n : 0;
+
+  // M1 rating trend
+  if (chrono.length >= 20) {
+    const delta = chrono[chrono.length - 1].myRating - chrono[0].myRating;
+    const flagged = delta <= -25;
+    metrics.M1 = {
+      id: 'M1', label: 'Rating trend', value: delta, flagged,
+      severity: flagged ? clamp(0, 100, Math.round(100 * (-delta) / 150)) : 0,
+      evidence: `Rating changed by ${delta >= 0 ? '+' : ''}${delta} over last ${chrono.length} games.`
+    };
+  }
+
+  // M2 color imbalance
+  const whiteGames = mainPool.filter(g => g.myColor === 'white');
+  const blackGames = mainPool.filter(g => g.myColor === 'black');
+  if (whiteGames.length >= 10 && blackGames.length >= 10) {
+    const wrWhite = whiteGames.filter(g => g.resultBucket === 'win').length / whiteGames.length;
+    const wrBlack = blackGames.filter(g => g.resultBucket === 'win').length / blackGames.length;
+    const gap = Math.abs(wrWhite - wrBlack);
+    const flagged = gap >= 0.12;
+    metrics.M2 = {
+      id: 'M2', label: 'Color imbalance', value: gap, flagged,
+      severity: flagged ? clamp(0, 100, Math.round(100 * (gap - 0.12) / 0.28)) : 0,
+      evidence: `White win rate ${(wrWhite * 100).toFixed(0)}%, Black win rate ${(wrBlack * 100).toFixed(0)}%.`,
+      wrWhite, wrBlack
+    };
+  }
+
+  // M3 worst openings
+  const byOpening = {};
+  for (const g of mainPool) {
+    if (!byOpening[g.opening]) byOpening[g.opening] = [];
+    byOpening[g.opening].push(g);
+  }
+  const openingStats = [];
+  for (const name in byOpening) {
+    const games = byOpening[name];
+    if (games.length < 5) continue;
+    const wr = games.filter(g => g.resultBucket === 'win').length / games.length;
+    if (wr < overallWinRate - 0.15) {
+      openingStats.push({ name, wr, n: games.length, severity: clamp(0, 100, Math.round(100 * (overallWinRate - wr) / 0.5)) });
+    }
+  }
+  if (openingStats.length > 0) {
+    openingStats.sort((a, b) => b.severity - a.severity);
+    const top2 = openingStats.slice(0, 2);
+    metrics.M3 = {
+      id: 'M3', label: 'Worst openings', value: top2[0].wr, flagged: true,
+      severity: top2[0].severity,
+      evidence: top2.map(o => `"${o.name}": ${(o.wr * 100).toFixed(0)}% win rate over ${o.n} games`).join('; '),
+      openings: top2
+    };
+  }
+
+  // M4 timeout losses
+  if (losses.length >= 10) {
+    const rate = losses.filter(g => g.lossType === 'timeout').length / losses.length;
+    const flagged = rate >= 0.15;
+    metrics.M4 = {
+      id: 'M4', label: 'Timeout losses', value: rate, flagged,
+      severity: flagged ? clamp(0, 100, Math.round(100 * (rate - 0.15) / 0.45)) : 0,
+      evidence: `${(rate * 100).toFixed(0)}% of losses were on time.`
+    };
+  }
+
+  // M5 checkmated losses
+  if (losses.length >= 10) {
+    const rate = losses.filter(g => g.lossType === 'checkmated').length / losses.length;
+    const flagged = rate >= 0.30;
+    metrics.M5 = {
+      id: 'M5', label: 'Checkmated losses', value: rate, flagged,
+      severity: flagged ? clamp(0, 100, Math.round(100 * (rate - 0.30) / 0.50)) : 0,
+      evidence: `${(rate * 100).toFixed(0)}% of losses ended in checkmate.`
+    };
+  }
+
+  // M6 short-game losses
+  if (losses.length >= 10) {
+    const rate = losses.filter(g => g.plyCount <= 30).length / losses.length;
+    const flagged = rate >= 0.25;
+    metrics.M6 = {
+      id: 'M6', label: 'Short-game losses', value: rate, flagged,
+      severity: flagged ? clamp(0, 100, Math.round(100 * (rate - 0.25) / 0.45)) : 0,
+      evidence: `${(rate * 100).toFixed(0)}% of losses ended in 30 plies or fewer.`
+    };
+  }
+
+  // M7 long-game losses
+  if (losses.length >= 10) {
+    const rate = losses.filter(g => g.plyCount >= 80).length / losses.length;
+    const flagged = rate >= 0.30;
+    metrics.M7 = {
+      id: 'M7', label: 'Long-game losses', value: rate, flagged,
+      severity: flagged ? clamp(0, 100, Math.round(100 * (rate - 0.30) / 0.50)) : 0,
+      evidence: `${(rate * 100).toFixed(0)}% of losses lasted 80 plies or more.`
+    };
+  }
+
+  // M8 accuracy
+  const accGames = mainPool.filter(g => typeof g.myAccuracy === 'number');
+  if (accGames.length >= 15) {
+    const mean = accGames.reduce((s, g) => s + g.myAccuracy, 0) / accGames.length;
+    const flagged = mean < 75;
+    metrics.M8 = {
+      id: 'M8', label: 'Accuracy', value: mean, flagged,
+      severity: flagged ? clamp(0, 100, Math.round(100 * (75 - mean) / 35)) : 0,
+      evidence: `Average accuracy ${mean.toFixed(1)}% over ${accGames.length} analyzed games.`
+    };
+  }
+
+  // M9 tilt
+  {
+    const sessions = [];
+    let cur = [];
+    for (let i = 0; i < chrono.length; i++) {
+      if (cur.length === 0) { cur.push(chrono[i]); continue; }
+      const gapHrs = (chrono[i].end_time - cur[cur.length - 1].end_time) / 3600;
+      if (gapHrs > 2) { sessions.push(cur); cur = [chrono[i]]; }
+      else cur.push(chrono[i]);
+    }
+    if (cur.length) sessions.push(cur);
+
+    let tiltLosses = 0, totalLossesInSessions = 0, anyFourStreak = false, anyFiveStreak = false;
+    for (const session of sessions) {
+      let streak = 0;
+      for (const g of session) {
+        if (g.resultBucket === 'loss') {
+          streak++;
+          totalLossesInSessions++;
+          if (streak >= 3) tiltLosses++;
+          if (streak >= 4) anyFourStreak = true;
+          if (streak >= 5) anyFiveStreak = true;
+        } else {
+          streak = 0;
+        }
+      }
+    }
+    const tiltIndex = totalLossesInSessions > 0 ? tiltLosses / totalLossesInSessions : 0;
+    const flagged = tiltIndex >= 0.20 || anyFourStreak;
+    let severity = 0;
+    if (flagged) {
+      severity = clamp(0, 100, Math.round(100 * tiltIndex / 0.60) + (anyFiveStreak ? 15 : 0));
+    }
+    metrics.M9 = {
+      id: 'M9', label: 'Tilt', value: tiltIndex, flagged, severity,
+      evidence: `Tilt index ${(tiltIndex * 100).toFixed(0)}%${anyFourStreak ? '; at least one 4+ loss streak detected' : ''}.`
+    };
+  }
+
+  return { metrics, overallWinRate, n };
+}
+
+function topWeaknesses(metrics) {
+  const flagged = Object.values(metrics).filter(m => m.flagged);
+  flagged.sort((a, b) => b.severity - a.severity);
+  return flagged.slice(0, 3);
+}
+
+/* =========================================================
+   PLAN GENERATION
+   ========================================================= */
+const PLAN_TABLE = {
+  M1: {
+    label: 'Rating trend', drills: ['Play only your main time class, capped games/day', 'Review every loss before playing the next game'],
+    direction: 'up', target: () => 0
+  },
+  M2: {
+    label: 'Color imbalance', drills: ['Study 3 opening lines for your weaker color', 'Deliberately play the weaker color more often'],
+    direction: 'down', target: () => 0.08
+  },
+  M3: {
+    label: 'Worst openings', drills: ['Review your top-2 worst-performing openings', 'Build a small repertoire around solid replacements'],
+    direction: 'up', target: (baseline) => baseline // handled specially (opening winrate vs overall-0.05)
+  },
+  M4: {
+    label: 'Timeout losses', drills: ['Budget total time / 40 per move', 'Prefer time controls with increment'],
+    direction: 'down', target: (baseline) => Math.min(0.10, baseline - 0.05)
+  },
+  M5: {
+    label: 'Checkmated losses', drills: ['Daily king-safety puzzles', 'Daily mating-net puzzles'],
+    direction: 'down', target: (baseline) => Math.max(0.20, baseline - 0.10)
+  },
+  M6: {
+    label: 'Short-game losses', drills: ['20 tactics puzzles/day (forks, pins, hanging pieces)', 'Slow down for the first 10 moves'],
+    direction: 'down', target: (baseline) => Math.max(0.15, baseline - 0.10)
+  },
+  M7: {
+    label: 'Long-game losses', drills: ['15 endgame drills/day (K+P, rook endings, opposition)'],
+    direction: 'down', target: (baseline) => Math.max(0.20, baseline - 0.10)
+  },
+  M8: {
+    label: 'Accuracy', drills: ['Blunder-check routine before every move', 'Post-game self-review of each loss'],
+    direction: 'up', target: (baseline) => Math.min(baseline + 5, 82)
+  },
+  M9: {
+    label: 'Tilt', drills: ['Stop-loss rule: quit after 2 straight losses', 'Take 10-minute breaks between sessions'],
+    direction: 'down', target: () => 0.10
+  }
+};
+
+function generatePlan(weaknesses, metrics, overallWinRate, timeClass) {
+  const goals = weaknesses.map(w => {
+    const cfg = PLAN_TABLE[w.id];
+    let targetValue;
+    if (w.id === 'M3') {
+      targetValue = overallWinRate - 0.05;
+    } else {
+      targetValue = cfg.target(w.value);
+    }
+    return {
+      weaknessId: w.id,
+      label: cfg.label,
+      metricId: w.id,
+      baseline: w.value,
+      targetValue,
+      direction: cfg.direction,
+      drills: cfg.drills.slice()
+    };
+  });
+  return {
+    planId: uid(),
+    status: 'active',
+    timeClass,
+    createdAt: Date.now(),
+    sampleWindow: 20,
+    goals
+  };
+}
+
+/* =========================================================
+   ANALYSIS ORCHESTRATION
+   ========================================================= */
+async function runAnalysis(username, triggeredByUser) {
+  const fetchStatusEl = document.getElementById('fetch-status');
+  const fetchErrorEl = document.getElementById('fetch-error');
+  fetchErrorEl.hidden = true;
+  fetchStatusEl.textContent = 'Validating account…';
+
+  try {
+    await fetchPlayerProfile(username);
+    fetchStatusEl.textContent = 'Fetching games…';
+    const rawGames = await fetchAllGames(username);
+    fetchStatusEl.textContent = 'Analyzing…';
+
+    const pool = buildGamePool(rawGames, username);
+    liveGames = pool;
+
+    if (pool.length < 20) {
+      document.getElementById('insufficient-data').hidden = false;
+      document.getElementById('dashboard').hidden = true;
+      fetchStatusEl.textContent = `Loaded ${pool.length} rated chess games (need 20+).`;
+      appData.profile.chessUser = username;
+      appData.profile.updatedAt = Date.now();
+      scheduleSave();
+      return;
+    }
+
+    const mainTC = pickMainTimeClass(pool);
+    const mainPool = pool.filter(g => g.time_class === mainTC);
+    const { metrics, overallWinRate, n } = computeMetrics(mainPool);
+    liveMetrics = { metrics, overallWinRate, n, mainTC, mainPool };
+
+    appData.profile.chessUser = username;
+    appData.profile.mainTimeClass = mainTC;
+    appData.profile.updatedAt = Date.now();
+
+    document.getElementById('insufficient-data').hidden = true;
+    document.getElementById('dashboard').hidden = false;
+    fetchStatusEl.textContent = `Analysis complete — ${pool.length} games loaded, main time class: ${escapeHTML(mainTC)}.`;
+
+    processPlanState(pool, mainPool, metrics, overallWinRate, mainTC);
+
+    renderDashboard();
+    scheduleSave();
+  } catch (err) {
+    fetchStatusEl.textContent = '';
+    fetchErrorEl.hidden = false;
+    fetchErrorEl.innerHTML = `<strong>Couldn't load data</strong><span>${escapeHTML(err.message)}</span>`;
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'secondary';
+    retryBtn.textContent = 'Retry';
+    retryBtn.addEventListener('click', () => runAnalysis(username, true));
+    fetchErrorEl.appendChild(retryBtn);
+  }
+}
+
+function ratingsSnapshot(pool) {
+  return ratingByTimeClass(pool);
+}
+
+function processPlanState(pool, mainPool, metrics, overallWinRate, mainTC) {
+  const weaknesses = topWeaknesses(metrics);
+
+  if (!appData.activePlanId) {
+    // no active plan -> generate
+    const plan = generatePlan(weaknesses, metrics, overallWinRate, mainTC);
+    appData.plans[plan.planId] = plan;
+    appData.activePlanId = plan.planId;
+    appData.baselines[plan.planId] = {
+      createdAt: plan.createdAt,
+      windowGameCount: mainPool.length,
+      lastGameEndTime: mainPool.length ? mainPool[0].end_time : 0,
+      ratingByTC: ratingsSnapshot(pool),
+      metrics
+    };
+    appData.checkpoints[plan.planId] = appData.checkpoints[plan.planId] || {};
+    document.getElementById('achieved-banner').hidden = true;
+    return;
+  }
+
+  const planId = appData.activePlanId;
+  const plan = appData.plans[planId];
+  if (!plan) { appData.activePlanId = null; return; }
+
+  const baseline = appData.baselines[planId];
+  const newGames = mainPool.filter(g => g.end_time > plan.createdAt);
+  const newGamesCount = newGames.length;
+
+  let overallAchieved = false;
+  const goalStatus = {};
+
+  if (newGamesCount < 20) {
+    for (const goal of plan.goals) {
+      goalStatus[goal.metricId] = { status: 'pending', note: `${newGamesCount} of 20 games played` };
+    }
+  } else {
+    let allAchieved = true;
+    for (const goal of plan.goals) {
+      const m = metrics[goal.metricId];
+      const currentValue = m ? m.value : goal.baseline;
+      let status;
+      const achieved = goal.direction === 'up' ? currentValue >= goal.targetValue : currentValue <= goal.targetValue;
+      if (achieved) {
+        status = 'achieved';
+      } else {
+        const totalGap = goal.direction === 'up' ? (goal.targetValue - goal.baseline) : (goal.baseline - goal.targetValue);
+        const moved = goal.direction === 'up' ? (currentValue - goal.baseline) : (goal.baseline - currentValue);
+        if (totalGap === 0) {
+          status = 'flat';
+        } else if (moved >= 0.30 * totalGap) {
+          status = 'on-track';
+        } else if (moved <= -0.05 * Math.abs(totalGap)) {
+          status = 'regressing';
+        } else {
+          status = 'flat';
+        }
+      }
+      if (status !== 'achieved') allAchieved = false;
+      goalStatus[goal.metricId] = { status, currentValue, note: '' };
+    }
+
+    const currentMainRating = mainPool.length ? mainPool[0].myRating : baseline.ratingByTC[mainTC];
+    const baselineRating = baseline.ratingByTC[mainTC] || currentMainRating;
+    const m1Delta = metrics.M1 ? metrics.M1.value : 0;
+    overallAchieved = allAchieved || ((currentMainRating - baselineRating) >= 40 && m1Delta >= 0);
+  }
+
+  // write checkpoint max once/day
+  const today = todayKey();
+  appData.checkpoints[planId] = appData.checkpoints[planId] || {};
+  const existingToday = Object.values(appData.checkpoints[planId]).find(c => new Date(c.at).toISOString().slice(0, 10) === today);
+  if (!existingToday) {
+    const epoch = String(Date.now());
+    appData.checkpoints[planId][epoch] = {
+      at: Date.now(),
+      newGamesSince: newGamesCount,
+      ratingByTC: ratingsSnapshot(pool),
+      goalStatus,
+      overallAchieved
+    };
+  }
+
+  if (overallAchieved) {
+    const currentMainRating = mainPool.length ? mainPool[0].myRating : baseline.ratingByTC[mainTC];
+    const baselineRating = baseline.ratingByTC[mainTC] || currentMainRating;
+    appData.history[planId] = {
+      achievedAt: Date.now(),
+      outcome: 'achieved',
+      ratingDelta: currentMainRating - baselineRating
+    };
+    plan.status = 'achieved';
+    document.getElementById('achieved-banner').hidden = false;
+    document.getElementById('achieved-banner').innerHTML =
+      `🎉 <strong>Plan achieved!</strong> Great work — your rating moved by ${currentMainRating - baselineRating >= 0 ? '+' : ''}${currentMainRating - baselineRating} and your goals are met. A new plan has been generated.`;
+
+    // auto-generate next plan
+    const newWeaknesses = topWeaknesses(metrics);
+    const nextPlan = generatePlan(newWeaknesses, metrics, overallWinRate, mainTC);
+    appData.plans[nextPlan.planId] = nextPlan;
+    appData.activePlanId = nextPlan.planId;
+    appData.baselines[nextPlan.planId] = {
+      createdAt: nextPlan.createdAt,
+      windowGameCount: mainPool.length,
+      lastGameEndTime: mainPool.length ? mainPool[0].end_time : 0,
+      ratingByTC: ratingsSnapshot(pool),
+      metrics
+    };
+    appData.checkpoints[nextPlan.planId] = appData.checkpoints[nextPlan.planId] || {};
+  } else {
+    document.getElementById('achieved-banner').hidden = true;
+  }
+
+  // stash goalStatus for rendering
+  liveMetrics.goalStatus = goalStatus;
+  liveMetrics.newGamesCount = newGamesCount;
+}
+
+/* =========================================================
+   RENDERING
+   ========================================================= */
+function statusBadge(status) {
+  const map = {
+    pending: { icon: '⏳', word: 'Pending' },
+    achieved: { icon: '✅', word: 'Achieved' },
+    'on-track': { icon: '📈', word: 'On track' },
+    flat: { icon: '➖', word: 'Flat' },
+    regressing: { icon: '⚠️', word: 'Regressing' }
+  };
+  const s = map[status] || map.pending;
+  return `<span class="badge ${status}">${s.icon} ${s.word}</span>`;
+}
+
+function renderDashboard() {
+  if (!liveMetrics) return;
+  renderRatingCards();
+  renderWeaknesses();
+  renderPlanPanel();
+  renderCheckpoints();
+  renderPlanHistory();
+}
+
+function renderRatingCards() {
+  const el = document.getElementById('rating-cards');
+  const byTc = ratingsSnapshot(liveGames);
+  // compute trend per TC from chronological first vs last within pool
+  const chronoByTc = {};
+  for (const g of liveGames) {
+    if (!chronoByTc[g.time_class]) chronoByTc[g.time_class] = [];
+    chronoByTc[g.time_class].push(g);
+  }
+  let html = '';
+  for (const tc in byTc) {
+    const games = (chronoByTc[tc] || []).slice().sort((a, b) => a.end_time - b.end_time);
+    const delta = games.length >= 2 ? games[games.length - 1].myRating - games[0].myRating : 0;
+    let trendClass = 'flat', arrow = '→', label = 'Stable';
+    if (delta > 5) { trendClass = 'up'; arrow = '↑'; label = 'Rising'; }
+    else if (delta < -5) { trendClass = 'down'; arrow = '↓'; label = 'Falling'; }
+    html += `
+      <div class="card rating-card">
+        <h3>${escapeHTML(tc)}${tc === liveMetrics.mainTC ? ' (main)' : ''}</h3>
+        <div class="value">${escapeHTML(byTc[tc])}</div>
+        <div class="trend ${trendClass}">${arrow} <span>${label} (${delta >= 0 ? '+' : ''}${delta})</span></div>
+      </div>`;
+  }
+  el.innerHTML = html || '<p class="muted">No rating data.</p>';
+}
+
+function renderWeaknesses() {
+  const el = document.getElementById('weakness-panel');
+  const weaknesses = topWeaknesses(liveMetrics.metrics);
+  if (weaknesses.length === 0) {
+    el.innerHTML = '<p class="muted">No significant weaknesses detected right now — nice work.</p>';
+    return;
+  }
+  let html = '';
+  for (const w of weaknesses) {
+    html += `
+      <div class="weakness-item">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong>${escapeHTML(w.label)}</strong>
+          <span class="muted">${w.severity}/100</span>
+        </div>
+        <div class="severity-bar-track" role="img" aria-label="Severity ${w.severity} out of 100">
+          <div class="severity-bar-fill" style="width:${w.severity}%;"></div>
+        </div>
+        <div class="evidence">${escapeHTML(w.evidence)}</div>
+      </div>`;
+  }
+  el.innerHTML = html;
+}
+
+function fmtPct(v) { return (v * 100).toFixed(1) + '%'; }
+function fmtGoalValue(metricId, v) {
+  if (metricId === 'M1') return (v >= 0 ? '+' : '') + Math.round(v);
+  if (metricId === 'M8') return v.toFixed(1) + '%';
+  return fmtPct(v);
+}
+
+function renderPlanPanel() {
+  const el = document.getElementById('plan-panel');
+  const planId = appData.activePlanId;
+  const plan = planId ? appData.plans[planId] : null;
+  if (!plan) {
+    el.innerHTML = '<p class="muted">No active plan.</p>';
+    return;
+  }
+  const goalStatus = liveMetrics.goalStatus || {};
+  const newGamesCount = liveMetrics.newGamesCount;
+  let progressNote = '';
+  if (typeof newGamesCount === 'number' && newGamesCount < 20) {
+    progressNote = `<p class="muted">${newGamesCount} of 20 games played toward next evaluation.</p>`;
+  }
+
+  let html = `<p class="muted">Time class: ${escapeHTML(plan.timeClass)} · Created ${new Date(plan.createdAt).toLocaleDateString()}</p>${progressNote}`;
+  for (const goal of plan.goals) {
+    const gs = goalStatus[goal.metricId] || { status: 'pending', note: `0 of 20 games played` };
+    html += `
+      <div class="goal">
+        <div class="goal-head">
+          <strong>${escapeHTML(goal.label)}</strong>
+          ${statusBadge(gs.status)}
+        </div>
+        <p class="muted" style="margin:0.4em 0;">
+          Baseline: ${fmtGoalValue(goal.metricId, goal.baseline)} → Target: ${fmtGoalValue(goal.metricId, goal.targetValue)}
+          ${gs.note ? ' · ' + escapeHTML(gs.note) : ''}
+        </p>
+        <ul class="drills">
+          ${goal.drills.map(d => `<li>${escapeHTML(d)}</li>`).join('')}
+        </ul>
+      </div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderCheckpoints() {
+  const planId = appData.activePlanId;
+  const sparkEl = document.getElementById('sparkline-wrap');
+  const listEl = document.getElementById('checkpoint-list');
+  const checkpoints = (planId && appData.checkpoints[planId]) ? Object.values(appData.checkpoints[planId]) : [];
+  checkpoints.sort((a, b) => a.at - b.at);
+
+  if (checkpoints.length === 0) {
+    sparkEl.innerHTML = '<p class="muted">No checkpoints yet.</p>';
+    listEl.innerHTML = '';
+    return;
+  }
+
+  const mainTC = liveMetrics.mainTC;
+  const ratings = checkpoints.map(c => c.ratingByTC && c.ratingByTC[mainTC]).filter(r => typeof r === 'number');
+  if (ratings.length >= 2) {
+    const w = 500, h = 100, pad = 10;
+    const min = Math.min(...ratings), max = Math.max(...ratings);
+    const range = max - min || 1;
+    const pts = ratings.map((r, i) => {
+      const x = pad + (i / (ratings.length - 1)) * (w - 2 * pad);
+      const y = h - pad - ((r - min) / range) * (h - 2 * pad);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    sparkEl.innerHTML = `
+      <svg viewBox="0 0 ${w} ${h}" width="100%" height="100" role="img" aria-label="Rating sparkline over ${ratings.length} checkpoints, from ${min} to ${max}">
+        <polyline points="${pts}" fill="none" stroke="var(--accent-cyan)" stroke-width="2" />
+      </svg>`;
+  } else {
+    sparkEl.innerHTML = '<p class="muted">Not enough checkpoints yet for a sparkline.</p>';
+  }
+
+  let html = '<table><thead><tr><th>Date</th><th>New games</th><th>Rating</th><th>Overall</th></tr></thead><tbody>';
+  for (const c of checkpoints.slice().reverse()) {
+    const r = c.ratingByTC && c.ratingByTC[mainTC];
+    html += `<tr>
+      <td>${new Date(c.at).toLocaleDateString()}</td>
+      <td>${c.newGamesSince}</td>
+      <td>${typeof r === 'number' ? r : '—'}</td>
+      <td>${c.overallAchieved ? '✅ Achieved' : '⏳ In progress'}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  listEl.innerHTML = html;
+}
+
+function renderPlanHistory() {
+  const el = document.getElementById('plan-history-list');
+  const entries = Object.entries(appData.history || {});
+  if (entries.length === 0) {
+    el.innerHTML = '<p class="muted">No completed plans yet.</p>';
+    return;
+  }
+  entries.sort((a, b) => b[1].achievedAt - a[1].achievedAt);
+  let html = '';
+  for (const [planId, hist] of entries) {
+    const plan = appData.plans[planId];
+    html += `
+      <div class="plan-history-item">
+        <strong>${plan ? escapeHTML(plan.timeClass) : 'Plan'}</strong>
+        · achieved ${new Date(hist.achievedAt).toLocaleDateString()}
+        · rating change ${hist.ratingDelta >= 0 ? '+' : ''}${hist.ratingDelta}
+      </div>`;
+  }
+  el.innerHTML = html;
+}
+
+/* =========================================================
+   EVENT WIRING
+   ========================================================= */
+document.getElementById('setup-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const username = document.getElementById('username-input').value.trim();
+  if (!username) return;
+  runAnalysis(username, true);
+});
+
+document.getElementById('btn-refresh').addEventListener('click', () => {
+  const username = appData.profile.chessUser || document.getElementById('username-input').value.trim();
+  if (!username) return;
+  runAnalysis(username, true);
+});
+</script>
+</body>
+</html>
