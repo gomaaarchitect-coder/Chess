@@ -81,6 +81,37 @@
   .goal-head { display:flex; justify-content:space-between; align-items:center; gap:0.5em; flex-wrap:wrap; }
   .drills { margin:0.6em 0 0; padding-left:1.2em; }
   .drills li { margin-bottom:0.3em; }
+  .wk-explain { margin-top:0.6em; border-top:1px solid var(--border); }
+  .wk-explain > summary {
+    cursor:pointer; padding:0.5em 0; font-weight:600; color:var(--accent-cyan);
+    min-height:44px; display:flex; align-items:center; list-style-position:inside;
+  }
+  .wk-explain p { margin:0.3em 0; color:var(--text-secondary); }
+  .wk-explain p strong { color:var(--text-primary); }
+  .plan-intro {
+    background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;
+    padding:0.9em 1em; margin:0.6em 0 1em; color:var(--text-secondary); font-size:0.95rem;
+  }
+  .phase-timeline { display:flex; gap:0.5em; list-style:none; padding:0; margin:0 0 1em; }
+  .phase-timeline .phase {
+    flex:1; text-align:center; padding:0.6em; border-radius:8px; border:1px solid var(--border);
+    background:var(--bg-secondary); display:flex; flex-direction:column; gap:0.2em;
+  }
+  .phase-timeline .phase.current { border-color:var(--accent-cyan); }
+  .phase-timeline .phase.done .phase-num { color:var(--success); }
+  .phase-timeline .phase.upcoming .phase-num { color:var(--text-muted); }
+  .phase-timeline .phase-num { font-weight:700; font-size:1.1rem; }
+  .phase-timeline .phase-name { font-weight:600; }
+  @media (max-width:520px) { .phase-timeline { flex-direction:column; } }
+  .goal-phase { margin-top:0.4em; }
+  .phase-tag {
+    display:inline-block; font-size:0.8rem; font-weight:600; color:var(--accent-cyan);
+    text-transform:uppercase; letter-spacing:0.03em; margin:0.6em 0 0.2em;
+  }
+  .cadence {
+    font-size:0.8rem; color:var(--text-secondary); border:1px solid var(--border);
+    border-radius:999px; padding:0.05em 0.5em; margin-left:0.4em; white-space:nowrap;
+  }
   .rating-card { text-align:left; }
   .rating-card .value { font-size:1.6rem; font-weight:700; }
   .trend { font-size:0.9rem; display:flex; align-items:center; gap:0.3em; }
@@ -821,6 +852,145 @@ const PLAN_TABLE = {
   }
 };
 
+const WEAKNESS_EXPLAIN = {
+  M1: {
+    what: 'Your rating is trending downward across your recent games — you\'re losing more rating points than you\'re gaining, not just having a normal bad day.',
+    why: 'A sustained slide usually means something systematic (a leaky opening, fatigue, or playing on tilt), not variance. Left alone a 25–50 point slide often compounds because you keep meeting stronger-than-expected opponents while shaken.',
+    detect: 'Flagged when your rating dropped by 25 points or more across your last 20+ games in the main time class. Needs at least 20 games to judge a trend.',
+    drills: [
+      'Stop spreading form across blitz, rapid, and bullet at once. Pick one control and cap yourself (e.g. 3–5 games/day) so each game gets full attention and one bad session can\'t tank you.',
+      'A 2-minute look at where the game turned breaks the "lose, requeue angry, lose again" cycle that drives slides.'
+    ]
+  },
+  M2: {
+    what: 'You perform noticeably better with one color than the other — usually a weaker Black repertoire, since Black reacts to White\'s choices.',
+    why: 'You play Black roughly half your games, so a weak Black score caps your rating directly. A 12%+ win-rate gap between colors is often worth 50–100 rating points once closed.',
+    detect: 'Flagged when your win rate with White and with Black differ by 12 percentage points or more, and you have at least 10 games with each color.',
+    drills: [
+      'Learn a small, solid answer to the 3 most common first moves you face with the weak color (e.g. vs 1.e4, 1.d4, 1.c4) so you reach a playable middlegame instead of guessing on move 4.',
+      'Reps matter: seek out the weak color (or just stop dodging it) so the new lines become automatic.'
+    ]
+  },
+  M3: {
+    what: 'One or two specific openings score far below your overall win rate — you keep reaching positions you don\'t understand or don\'t enjoy.',
+    why: 'A single bad opening you play often is a repeated tax on every game it appears in. Fixing it is the highest-leverage opening work available because the same fix pays off game after game.',
+    detect: 'Flagged when any opening you\'ve played 5+ times scores more than 15 percentage points below your overall win rate. Shows your worst two.',
+    drills: [
+      'Play through 3–4 of your own losses in each and find the recurring moment things go wrong (usually the same move or plan every time).',
+      'Swap the worst line for a principled, well-known alternative and learn it 4–5 moves deep. Depth beats width.'
+    ]
+  },
+  M4: {
+    what: 'You\'re losing games on the clock — running out of time in positions you might have held or won.',
+    why: 'Time losses are pure giveaways; the position was often fine. At club level poor time management can cost more rating than tactical mistakes, because it turns playable and even winning games into zeros.',
+    detect: 'Flagged when 15% or more of your losses ended on time. Needs at least 10 losses to judge.',
+    drills: [
+      'Rough rule: divide your base time by ~40 to get an average per-move budget, and spend big only on genuinely critical moves. This stops you from burning 3 minutes on move 8.',
+      'An increment (e.g. 10+5, 15+10) gives you seconds back each move so you can\'t flag in a won endgame.'
+    ]
+  },
+  M5: {
+    what: 'A large share of your losses end in actual checkmate, not resignation — meaning you\'re getting mated rather than losing slowly on material.',
+    why: 'Being mated usually points to king-safety neglect: castling late, opening lines in front of your own king, or missing the opponent\'s attack. These are fixable habits, and fixing them removes whole categories of sudden losses.',
+    detect: 'Flagged when 30% or more of your losses ended in checkmate. Needs at least 10 losses.',
+    drills: [
+      'Short daily sets focused on defending your king and spotting incoming attacks train you to feel danger a move earlier.',
+      'Studying how mates are built (from both sides) makes you recognise the patterns being aimed at your own king.'
+    ]
+  },
+  M6: {
+    what: 'You\'re losing games very quickly — inside the first ~15 moves — typically to an early tactic, a hanging piece, or a known opening trap.',
+    why: 'Short losses mean points thrown away before the game really starts. They\'re the fastest thing to fix at club level: a little care in the opening erases them almost entirely.',
+    detect: 'Flagged when 25% or more of your losses ended in 30 plies (15 full moves) or fewer. Needs at least 10 losses.',
+    drills: [
+      'Daily tactics train the pattern-recognition that stops you from dropping pieces and lets you punish when the opponent does.',
+      'Before each of your first ten moves, check what your opponent\'s last move threatens. Most short losses are one skipped check.'
+    ]
+  },
+  M7: {
+    what: 'A large share of your losses come in long games — you reach the endgame (or a long middlegame) and then lose the thread.',
+    why: 'Losing games you kept alive for 40+ moves usually means an endgame technique gap: mishandling king-and-pawn or rook endings, or converting/holding poorly when tired. Endgame skill is famously underrated at club level and directly turns draws-and-losses into draws-and-wins.',
+    detect: 'Flagged when 30% or more of your losses lasted 80 plies (40 full moves) or more. Needs at least 10 losses.',
+    drills: [
+      'Focused daily drills on the handful of endings that decide most games (king-and-pawn, opposition, basic rook endings) so you know the winning/drawing method instead of guessing.'
+    ]
+  },
+  M8: {
+    what: 'Your average game accuracy (from chess.com\'s post-game analysis) is low — you\'re making frequent inaccuracies and outright blunders across a game.',
+    why: 'Accuracy is the broadest quality signal there is. Cutting blunders is the single biggest rating lever at every level below master; one fewer blunder per game is often worth 50+ rating points.',
+    detect: 'Flagged when your average accuracy is below 75% across your analyzed games. Needs at least 15 games that have accuracy data.',
+    drills: [
+      'Before you move, ask: "is anything of mine hanging, and what does this let my opponent do?" A one-second check catches most blunders.',
+      'Try to find your losing move yourself before turning on the engine; naming your own mistakes makes them stick.'
+    ]
+  },
+  M9: {
+    what: 'You lose in clusters — once one game goes badly, the next few tend to follow within the same session (a losing streak feeding on itself).',
+    why: 'Tilt losses aren\'t about chess ability; they\'re rating you give back while frustrated. They\'re also the easiest to eliminate because the fix is behavioural, not technical.',
+    detect: 'Flagged when either at least 20% of your in-session losses came during a streak of 3+ losses, or you had any streak of 4+ losses in a single session. (Sessions are split by gaps of more than 2 hours between games.)',
+    drills: [
+      'Two losses in a row is your session\'s stop sign. Walk away and your rating stops bleeding immediately.',
+      'A short reset (stand up, water, no screen) clears the frustration that turns one loss into five.'
+    ]
+  }
+};
+
+const PHASE_PLAN = {
+  intro: 'How this plan works. Your plan targets your 2–3 biggest weaknesses right now. Work the drills, then keep playing your main time class as normal. After every 20 new games the app re-measures each goal and marks it Pending (not enough new games yet), On track, Flat, Regressing, or Achieved. When all goals are achieved — or your rating climbs 40+ points with a non-negative trend — the plan completes, moves to your history, and a fresh plan is generated from whatever your biggest weaknesses are by then. You don\'t have to finish everything at once; the phases below tell you what to do first.',
+  phases: [
+    { key: 'stabilize', name: 'Stabilize', timing: 'Week 1' },
+    { key: 'train', name: 'Train', timing: 'Weeks 2–3' },
+    { key: 'consolidate', name: 'Consolidate', timing: 'Week 4+' }
+  ],
+  goals: {
+    M1: [
+      { phase: 0, drillIdx: 1, cadence: 'daily' },
+      { phase: 1, drillIdx: 0, cadence: 'daily' },
+      { phase: 2, text: 'Keep loss-review, drop the cap once trend is positive', cadence: 'as needed' }
+    ],
+    M2: [
+      { phase: 0, drillIdx: 0, cadence: 'daily, ~15 min' },
+      { phase: 1, drillIdx: 1, cadence: 'every session' },
+      { phase: 2, text: 'Play both colors normally; refresh the 3 lines', cadence: '1×/week' }
+    ],
+    M3: [
+      { phase: 0, drillIdx: 0, cadence: 'daily, ~15 min, week 1' },
+      { phase: 1, drillIdx: 1, cadence: '3×/week' },
+      { phase: 2, text: 'Spot-check the new lines in your games', cadence: '1×/week' }
+    ],
+    M4: [
+      { phase: 0, drillIdx: 0, cadence: 'every game' },
+      { phase: 1, drillIdx: 1, cadence: 'every game' },
+      { phase: 2, text: 'Keep the budget habit', cadence: 'every game' }
+    ],
+    M5: [
+      { phase: 0, drillIdx: 0, cadence: 'daily' },
+      { phase: 1, drillIdx: 1, cadence: 'daily' },
+      { phase: 2, text: 'Mixed king-safety + mate puzzles', cadence: '3×/week' }
+    ],
+    M6: [
+      { phase: 0, drillIdx: 1, cadence: 'every game' },
+      { phase: 1, drillIdx: 0, cadence: 'daily' },
+      { phase: 2, text: '20 tactics + keep the opening check', cadence: '3×/week' }
+    ],
+    M7: [
+      { phase: 0, text: 'List your endgame gaps from recent long losses', cadence: 'week 1' },
+      { phase: 1, drillIdx: 0, cadence: 'daily' },
+      { phase: 2, text: '15 endgame drills', cadence: '3×/week' }
+    ],
+    M8: [
+      { phase: 0, drillIdx: 0, cadence: 'every move, every game' },
+      { phase: 1, drillIdx: 1, cadence: 'every loss' },
+      { phase: 2, text: 'Blunder-check stays permanent', cadence: 'every move' }
+    ],
+    M9: [
+      { phase: 0, drillIdx: 0, cadence: 'every session' },
+      { phase: 1, drillIdx: 1, cadence: 'every session' },
+      { phase: 2, text: 'Both habits become default', cadence: 'ongoing' }
+    ]
+  }
+};
+
 function generatePlan(weaknesses, metrics, overallWinRate, timeClass) {
   const goals = weaknesses.map(w => {
     const cfg = PLAN_TABLE[w.id];
@@ -1088,6 +1258,7 @@ function renderWeaknesses() {
   }
   let html = '';
   for (const w of weaknesses) {
+    const ex = WEAKNESS_EXPLAIN[w.id];
     html += `
       <div class="weakness-item">
         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -1098,6 +1269,16 @@ function renderWeaknesses() {
           <div class="severity-bar-fill" style="width:${w.severity}%;"></div>
         </div>
         <div class="evidence">${escapeHTML(w.evidence)}</div>
+        ${ex ? `
+        <details class="wk-explain">
+          <summary>Why this matters</summary>
+          <p><strong>What it is:</strong> ${escapeHTML(ex.what)}</p>
+          <p><strong>Why it costs you:</strong> ${escapeHTML(ex.why)}</p>
+        </details>
+        <details class="wk-explain">
+          <summary>How we detected this</summary>
+          <p>${escapeHTML(ex.detect)}</p>
+        </details>` : ''}
       </div>`;
   }
   el.innerHTML = html;
@@ -1126,8 +1307,53 @@ function renderPlanPanel() {
   }
 
   let html = `<p class="muted">Time class: ${escapeHTML(plan.timeClass)} · Created ${new Date(plan.createdAt).toLocaleDateString()}</p>${progressNote}`;
+  html += `<div class="plan-intro">${escapeHTML(PHASE_PLAN.intro)}</div>`;
+
+  const allAchieved = plan.goals.length > 0 && plan.goals.every(g => (goalStatus[g.metricId] || {}).status === 'achieved');
+  let currentPhaseIdx;
+  if (typeof newGamesCount === 'number' && newGamesCount < 20) currentPhaseIdx = 0;
+  else if (allAchieved) currentPhaseIdx = 2;
+  else currentPhaseIdx = 1;
+
+  html += '<ol class="phase-timeline">';
+  PHASE_PLAN.phases.forEach((ph, idx) => {
+    let state = 'upcoming', prefix = '';
+    if (idx < currentPhaseIdx) { state = 'done'; prefix = '✓ '; }
+    else if (idx === currentPhaseIdx) { state = 'current'; prefix = '→ '; }
+    html += `
+      <li class="phase ${state}"${state === 'current' ? ' aria-current="step"' : ''}>
+        <span class="phase-num">${idx + 1}</span>
+        <span class="phase-name">${prefix}${escapeHTML(ph.name)}</span>
+        <span class="phase-timing muted">${state === 'current' ? 'Current phase: ' : ''}${escapeHTML(ph.timing)}</span>
+      </li>`;
+  });
+  html += '</ol>';
+
   for (const goal of plan.goals) {
     const gs = goalStatus[goal.metricId] || { status: 'pending', note: `0 of 20 games played` };
+    const steps = PHASE_PLAN.goals[goal.metricId] || [];
+    const drillsByPhase = [[], [], []];
+    for (const step of steps) {
+      const text = typeof step.drillIdx === 'number'
+        ? (WEAKNESS_EXPLAIN[goal.metricId] && WEAKNESS_EXPLAIN[goal.metricId].drills[step.drillIdx]) || ''
+        : step.text;
+      drillsByPhase[step.phase].push({ text, cadence: step.cadence });
+    }
+    let goalPhasesHtml = '<div class="goal-phases">';
+    PHASE_PLAN.phases.forEach((ph, idx) => {
+      const items = drillsByPhase[idx];
+      if (items.length === 0) return;
+      const reached = idx === 2 && gs.status === 'achieved';
+      goalPhasesHtml += `
+        <div class="goal-phase${reached ? ' reached' : ''}">
+          <span class="phase-tag"${reached ? ' style="color:var(--success);"' : ''}>Phase ${idx + 1} · ${escapeHTML(ph.name)}</span>
+          <ul class="drills">
+            ${items.map(it => `<li>${escapeHTML(it.text)} <span class="cadence">${escapeHTML(it.cadence)}</span></li>`).join('')}
+          </ul>
+        </div>`;
+    });
+    goalPhasesHtml += '</div>';
+
     html += `
       <div class="goal">
         <div class="goal-head">
@@ -1138,9 +1364,7 @@ function renderPlanPanel() {
           Baseline: ${fmtGoalValue(goal.metricId, goal.baseline)} → Target: ${fmtGoalValue(goal.metricId, goal.targetValue)}
           ${gs.note ? ' · ' + escapeHTML(gs.note) : ''}
         </p>
-        <ul class="drills">
-          ${goal.drills.map(d => `<li>${escapeHTML(d)}</li>`).join('')}
-        </ul>
+        ${goalPhasesHtml}
       </div>`;
   }
   el.innerHTML = html;
